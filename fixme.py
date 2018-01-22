@@ -12,16 +12,20 @@
 import os
 import sys
 import getpass
+import logging
 from os.path import join
 import re
 import subprocess
 from github3 import GitHub
 
+logging.basicConfig()
+logger = logging.getLogger("fixme")
+logger.setLevel("ERROR")
 
 if len(sys.argv) >= 2:
     username = sys.argv[1]
 else:
-    print("username argument missing")
+    logger.error("username argument missing")
     quit()
 
 
@@ -31,7 +35,7 @@ sha = subprocess.check_output(["git", "rev-parse",  "--verify", "HEAD"], cwd='ru
 ratelimit_remaining = gh.issue("rust-lang", "rust", "1").ratelimit_remaining
 
 if ratelimit_remaining < 2000:
-   print("we do not seem to have enough ratelimit remaining to run. Aborting.")
+   logger.error("we do not seem to have enough ratelimit remaining to run. Aborting.")
    quit()
 
 def create_entries(gh, file_name):
@@ -43,7 +47,7 @@ def create_entries(gh, file_name):
                     issue = gh.issue("rust-lang", "rust", match.group(1))
                     closed = issue.is_closed()
                 except AttributeError:
-                    print("""failed to obtain issue for {issue_num}.
+                    logger.warning("""failed to obtain issue for {issue_num}.
 line: {line}
 source: {file_name}:{num}""".format(issue_num=match.group(1),
                         line=line,
@@ -51,7 +55,7 @@ source: {file_name}:{num}""".format(issue_num=match.group(1),
                         num=str(num + 1)))
                 else:
                     if closed:
-                        print(issue.ratelimit_remaining)
+                        logger.info(issue.ratelimit_remaining)
                         code_url = "https://github.com/rust-lang/rust/blob/{sha}/{filename}#L{number}".format(sha=sha, filename=file_name.replace("\\", "/")[5:], number=str(num + 1))
                         issue_url = "https://github.com/rust-lang/rust/issues/{fixme}".format(fixme=match.group(1))
                         yield """
@@ -67,5 +71,5 @@ with open("fixme.md", 'w') as target:
                 for entry in create_entries(gh, file_name):
                     target.write(entry)
             except UnicodeDecodeError:
-                print("could not decode {file_name} as UTF-8, skipping".format(file_name=file_name))
+                logger.warning("could not decode {file_name} as UTF-8, skipping".format(file_name=file_name))
             
