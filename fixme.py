@@ -22,23 +22,18 @@ logging.basicConfig()
 logger = logging.getLogger("fixme")
 logger.setLevel("ERROR")
 
-if len(sys.argv) >= 2:
-    username = sys.argv[1]
-else:
-    logger.error("username argument missing")
-    quit()
+def collectFixmes(gh, rust_path, fixme_path):
+    with open(fixme_path, 'w') as target:
+        target.write("This is the output of a half baked and first draft script to find fixmes on closed issues in rust.")
+        for root, dirs, files in os.walk(rust_path):
+            for file_name in (join(root, name) for name in files):
+                try:
+                    for entry in createEntries(gh, file_name):
+                        target.write(entry)
+                except UnicodeDecodeError:
+                    logger.warning("could not decode {file_name} as UTF-8, skipping".format(file_name=file_name))
 
-
-password = getpass.getpass()
-gh = GitHub(username, password)
-sha = subprocess.check_output(["git", "rev-parse",  "--verify", "HEAD"], cwd='rust/src').strip().decode()
-ratelimit_remaining = gh.issue("rust-lang", "rust", "1").ratelimit_remaining
-
-if ratelimit_remaining < 2000:
-   logger.error("we do not seem to have enough ratelimit remaining to run. Aborting.")
-   quit()
-
-def create_entries(gh, file_name):
+def createEntries(gh, file_name):
     with open(file_name, 'r', encoding='utf-8') as source:
         for num, line in enumerate(source):
             match = re.search("FIXME.*?(\d{4,6})", line)
@@ -63,13 +58,31 @@ source: {file_name}:{num}""".format(issue_num=match.group(1),
 [code]({code_url}) -> [issue]({issue_url})
 """.format(line=line.strip(), code_url=code_url, issue_url=issue_url)
 
-with open("fixme.md", 'w') as target:
-    target.write("This is the output of a half baked and first draft script to find fixmes on closed issues in rust.")
-    for root, dirs, files in os.walk('rust/src'):
-        for file_name in (join(root, name) for name in files):
-            try:
-                for entry in create_entries(gh, file_name):
-                    target.write(entry)
-            except UnicodeDecodeError:
-                logger.warning("could not decode {file_name} as UTF-8, skipping".format(file_name=file_name))
-            
+
+if len(sys.argv) >= 2:
+    username = sys.argv[1]
+else:
+    logger.error("username argument missing")
+    quit()
+
+try:
+    password = getpass.getpass()
+except (KeyboardInterrupt, SystemExit):
+    logger.error("password input cancelled, Aborting")
+    quit()
+
+gh = GitHub(username, password)
+rust_path = "rust/src"
+fixme_path = "fixme.md"
+sha = subprocess.check_output(["git", "rev-parse",  "--verify", "HEAD"], cwd='rust/src').strip().decode()
+ratelimit_remaining = gh.issue("rust-lang", "rust", "1").ratelimit_remaining
+
+if ratelimit_remaining < 2000:
+   logger.error("we do not seem to have enough ratelimit remaining to run. Aborting.")
+   quit()
+
+try:
+    collectFixmes(gh, rust_path, fixme_path)
+except (KeyboardInterrupt, SystemExit):
+    logger.warning("collection of fixmes interrupted, intermediary file can be found in {path}".format(path=fixme_path))
+    quit()
