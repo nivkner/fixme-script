@@ -54,7 +54,7 @@ source: {file_name}:{num}""".format(issue_num=match.group(1),
                         code_url = "https://github.com/rust-lang/rust/blob/{sha}/{filename}#L{number}".format(sha=sha, filename=file_name.replace("\\", "/")[5:], number=str(num + 1))
                         issue_url = "https://github.com/rust-lang/rust/issues/{fixme}".format(fixme=match.group(1))
                         yield """
-``` {line} ```
+* [ ] ``` {line} ```
 [code]({code_url}) -> [issue]({issue_url})
 """.format(line=line.strip(), code_url=code_url, issue_url=issue_url)
 
