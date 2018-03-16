@@ -24,7 +24,7 @@ logger.setLevel("ERROR")
 
 def collectFixmes(gh, rust_path, fixme_path):
     with open(fixme_path, 'w') as target:
-        target.write("This is the output of a half baked and first draft script to find fixmes on closed issues in rust.")
+        target.write("This is the output of a half baked and first draft script to find fixmes on closed issues in rust.\n")
         for root, dirs, files in os.walk(rust_path):
             for file_name in (join(root, name) for name in files):
                 try:
