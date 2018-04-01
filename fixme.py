@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 
-
-# this is a half baked and first draft script to find fixmes on closed issues in rust
+# this is a script to find fixmes on closed issues in rust
 # It requires python 3, github3, and a checkout of rust.
 # This is used in the metabug https://github.com/rust-lang/rust/issues/44366
-
-
-# If you want to improve it, please be in touch. I'd love to help, or see what you accomplish!
-
 
 import os
 import sys
@@ -24,7 +19,6 @@ logger.setLevel("ERROR")
 
 def collectFixmes(gh, rust_path, fixme_path):
     with open(fixme_path, 'w') as target:
-        target.write("This is the output of a half baked and first draft script to find fixmes on closed issues in rust.\n")
         for root, dirs, files in os.walk(rust_path):
             for file_name in (join(root, name) for name in files):
                 try:
