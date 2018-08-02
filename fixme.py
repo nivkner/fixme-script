@@ -11,7 +11,7 @@ import logging
 from os.path import join
 import re
 import subprocess
-from github3 import GitHub
+from github3 import GitHub, exceptions as GithubExceptions
 
 logging.basicConfig()
 logger = logging.getLogger("fixme")
@@ -35,7 +35,7 @@ def createEntries(gh, file_name):
                 try:
                     issue = gh.issue("rust-lang", "rust", match.group(1))
                     closed = issue.is_closed()
-                except AttributeError:
+                except (AttributeError, GithubExceptions.NotFoundError):
                     logger.warning("""failed to obtain issue for {issue_num}.
 line: {line}
 source: {file_name}:{num}""".format(issue_num=match.group(1),
