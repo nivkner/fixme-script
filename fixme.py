@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # this is a script to find fixmes on closed issues in rust
-# It requires python 3, github3, and a checkout of rust.
+# It requires python 3, PyGithub, and a checkout of rust.
 # This is used in the metabug https://github.com/rust-lang/rust/issues/44366
 
 import os
@@ -11,47 +11,43 @@ import logging
 from os.path import join
 import re
 import subprocess
-from github3 import GitHub, exceptions as GithubExceptions
+from github import Github
 
 logging.basicConfig()
 logger = logging.getLogger("fixme")
 logger.setLevel("ERROR")
 
-def collectFixmes(gh, rust_path, fixme_path):
+def collectFixmes(fixme_path):
     with open(fixme_path, 'w') as target:
         for root, dirs, files in os.walk(rust_path):
             for file_name in (join(root, name) for name in files):
                 try:
-                    for entry in createEntries(gh, file_name):
+                    for entry in createEntries(file_name):
                         target.write(entry)
                 except UnicodeDecodeError:
                     logger.warning("could not decode {file_name} as UTF-8, skipping".format(file_name=file_name))
 
-def createEntries(gh, file_name):
+def createEntries(file_name):
     with open(file_name, 'r', encoding='utf-8') as source:
         for num, line in enumerate(source):
             match = re.search("FIXME.*?(\d{4,6})", line)
             if match:
                 try:
-                    issue = gh.issue("rust-lang", "rust", match.group(1))
-                    closed = issue.is_closed()
-                except (AttributeError, GithubExceptions.NotFoundError):
+                    issue = repo.get_issue(int(match.group(1)))
+                    if issue.state == "closed":
+                        code_url = "https://github.com/rust-lang/rust/blob/{revision}/{filename}#L{number}".format(revision=revision, filename=file_name.replace("\\", "/")[5:], number=str(num + 1))
+                        issue_url = "https://github.com/rust-lang/rust/issues/{fixme}".format(fixme=match.group(1))
+                        yield """
+* [ ] ``` {line} ```
+[code]({code_url}) -> [issue]({issue_url})
+""".format(line=line.strip(), code_url=code_url, issue_url=issue_url)
+                except:
                     logger.warning("""failed to obtain issue for {issue_num}.
 line: {line}
 source: {file_name}:{num}""".format(issue_num=match.group(1),
                         line=line,
                         file_name=file_name,
                         num=str(num + 1)))
-                else:
-                    if closed:
-                        logger.info(issue.ratelimit_remaining)
-                        code_url = "https://github.com/rust-lang/rust/blob/{sha}/{filename}#L{number}".format(sha=sha, filename=file_name.replace("\\", "/")[5:], number=str(num + 1))
-                        issue_url = "https://github.com/rust-lang/rust/issues/{fixme}".format(fixme=match.group(1))
-                        yield """
-* [ ] ``` {line} ```
-[code]({code_url}) -> [issue]({issue_url})
-""".format(line=line.strip(), code_url=code_url, issue_url=issue_url)
-
 
 if len(sys.argv) >= 2:
     username = sys.argv[1]
@@ -65,18 +61,14 @@ except (KeyboardInterrupt, SystemExit):
     logger.error("password input cancelled, Aborting")
     quit()
 
-gh = GitHub(username, password)
+gh = Github(username, password)
+repo = gh.get_repo("rust-lang/rust")
 rust_path = "rust/src"
 fixme_path = "fixme.md"
-sha = subprocess.check_output(["git", "rev-parse",  "--verify", "HEAD"], cwd='rust/src').strip().decode()
-ratelimit_remaining = gh.issue("rust-lang", "rust", "1").ratelimit_remaining
-
-if ratelimit_remaining < 2000:
-   logger.error("we do not seem to have enough ratelimit remaining to run. Aborting.")
-   quit()
+revision = subprocess.check_output(["git", "rev-parse",  "--verify", "HEAD"], cwd='rust/src').strip().decode()
 
 try:
-    collectFixmes(gh, rust_path, fixme_path)
+    collectFixmes(fixme_path)
 except (KeyboardInterrupt, SystemExit):
     logger.warning("collection of fixmes interrupted, intermediary file can be found in {path}".format(path=fixme_path))
     quit()
